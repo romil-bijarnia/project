@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Monitor Dashboard</title>
+  <style>
+    body { font-family: sans-serif; background: #f9f9f9; padding: 20px; }
+    .card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 0 10px #ccc; margin-bottom: 20px; }
+    .alert { color: red; font-weight: bold; }
+    .ok { color: green; font-weight: bold; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h2>Smart Monitor Dashboard</h2>
+
+  <div class="card">
+   
+    <p>Temperature: <span id="temp">Loading...</span> °C</p>
+    <p>Humidity: <span id="humidity">Loading...</span> %</p>
+    <p>Soil Moisture: <span id="soil">Loading...</span></p>
+    <p>Status: <span id="status">Checking...</span></p>
+  </div>
+
+  <div class="card">
+    <label for="motorControl">Motor Override: </label>
+    <select id="motorControl">
+      <option value="false">Off</option>
+      <option value="true">On</option>
+    </select>
+  </div>
+
+  <script>
+    // — your Firebase configuration —
+    const firebaseConfig = {
+      apiKey: "AIza....",
+      authDomain: "plant-monitor-fb8c1.firebaseapp.com",
+      databaseURL: "https://plant-monitor-fb8c1-default-rtdb.firebaseio.com",
+      projectId: "plant-monitor-fb8c1",
+      storageBucket: "plant-monitor-fb8c1.appspot.com",
+      messagingSenderId: "763217705119",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function setupRealtimeSensorListener() {
+      db.ref("sensor_data").on("value", snap => {
+        if (!snap.exists()) {
+          console.error("No /sensor_data node or insufficient permissions.");
+          return;
+        }
+        const data = snap.val();
+      
+        // Temperature and humidity
+        document.getElementById('temp').innerText     = (data.temp  != null) ? data.temp.toFixed(1)  : 'N/A';
+        document.getElementById('humidity').innerText = (data.humidity != null) ? data.humidity.toFixed(1) : 'N/A';
+        // Soil moisture
+        document.getElementById('soil').innerText = (data.soil != null) ? data.soil : 'N/A';
+
+        // status
+        const luxVal  = (typeof data.lux === 'number') ? data.lux : Infinity;
+        const tempVal = data.temp ?? -Infinity;
+        const humVal  = data.humidity ?? -Infinity;
+        const alertState = (luxVal < 200) || (tempVal > 35) || (humVal > 70);
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = alertState ? "ALERT" : "OK";
+        statusEl.className = alertState ? "alert" : "ok";
+      });
+    }
+
+    function setupRealtimeMotorListener() {
+      db.ref("commands/motor").on("value", snap => {
+        if (snap.exists()) {
+          document.getElementById('motorControl').value = String(snap.val());
+        }
+      });
+    }
+
+    document.getElementById('motorControl')
+      .addEventListener('change', () => {
+        const on = document.getElementById('motorControl').value === "true";
+        db.ref("commands/motor").set(on);
+      });
+
+    setupRealtimeSensorListener();
+    setupRealtimeMotorListener();
+  </script>
+</body>
+</html>
